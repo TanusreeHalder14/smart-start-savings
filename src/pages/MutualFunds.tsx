@@ -1,14 +1,14 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/sonner";
 import { ArrowUpRight, Info, TrendingUp, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import EnhancedSlider from "@/components/EnhancedSlider";
 
 interface MutualFund {
   id: string;
@@ -132,6 +132,15 @@ const MutualFunds = () => {
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [recommendedFunds, setRecommendedFunds] = useState<MutualFund[]>([]);
   const [activeTab, setActiveTab] = useState("all");
+  
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
 
   // Function to recommend funds based on user input
   const generateRecommendations = () => {
@@ -157,15 +166,6 @@ const MutualFunds = () => {
     toast.success("Recommendations generated based on your profile");
   };
   
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
   // Filter funds based on active tab
   const getFilteredFunds = () => {
     if (activeTab === "all") {
@@ -212,17 +212,15 @@ const MutualFunds = () => {
                   <Label>Monthly Investment Amount (₹)</Label>
                   <span className="text-sm font-medium">{formatCurrency(monthlyInvestment[0])}</span>
                 </div>
-                <Slider
+                <EnhancedSlider
                   value={monthlyInvestment}
                   min={1000}
                   max={50000}
                   step={1000}
                   onValueChange={setMonthlyInvestment}
+                  inputPrefix="₹"
+                  formatValue={(val) => `₹${val.toLocaleString()}`}
                 />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>₹1,000</span>
-                  <span>₹50,000</span>
-                </div>
               </div>
               
               <div className="space-y-2">
@@ -251,17 +249,14 @@ const MutualFunds = () => {
                   <Label>Expected Annual Return (%)</Label>
                   <span className="text-sm font-medium">{expectedReturn[0]}%</span>
                 </div>
-                <Slider
+                <EnhancedSlider
                   value={expectedReturn}
                   min={6}
                   max={18}
                   step={0.5}
                   onValueChange={setExpectedReturn}
+                  formatValue={(val) => `${val}%`}
                 />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>6%</span>
-                  <span>18%</span>
-                </div>
               </div>
             </div>
             
@@ -419,14 +414,7 @@ const MutualFunds = () => {
                       <p><span className="font-medium">Why this fund:</span> {fund.recommendation}</p>
                     </div>
                     
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="w-full"
-                    >
-                      <ArrowUpRight className="mr-2 h-3 w-3" /> 
-                      View Fund Details
-                    </Button>
+                    
                   </div>
                 </div>
               ))}

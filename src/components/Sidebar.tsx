@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { BarChart3, MessageCircle, Target, User } from "lucide-react";
+import { BarChart3, MessageCircle, Target, User, Calculator } from "lucide-react";
 
 interface SidebarProps {
   isMobile: boolean;
@@ -14,7 +14,7 @@ interface SidebarProps {
 const Sidebar = ({ isMobile, closeSidebar }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   
   const navItems = [
     {
@@ -37,6 +37,11 @@ const Sidebar = ({ isMobile, closeSidebar }: SidebarProps) => {
       icon: <BarChart3 className="w-5 h-5" />,
       href: "/mutual-funds",
     },
+    {
+      label: "Tax Optimizer",
+      icon: <Calculator className="w-5 h-5" />,
+      href: "/tax-optimizer",
+    },
   ];
   
   const handleNavigation = (href: string) => {
@@ -44,6 +49,11 @@ const Sidebar = ({ isMobile, closeSidebar }: SidebarProps) => {
     if (isMobile && closeSidebar) {
       closeSidebar();
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
   };
   
   return (
@@ -83,13 +93,21 @@ const Sidebar = ({ isMobile, closeSidebar }: SidebarProps) => {
       </nav>
       
       <div className="p-4 border-t">
-        <div className="rounded-lg bg-finance-muted p-4">
+        <div className="rounded-lg bg-finance-muted p-4 mb-3">
           <h3 className="font-medium text-sm mb-2">Pro Tip</h3>
           <p className="text-xs text-gray-600">
             Consistency is key in financial planning. Even small regular investments 
             can yield significant results over time.
           </p>
         </div>
+        
+        <Button 
+          variant="outline" 
+          className="w-full justify-start" 
+          onClick={handleLogout}
+        >
+          Logout
+        </Button>
       </div>
     </aside>
   );

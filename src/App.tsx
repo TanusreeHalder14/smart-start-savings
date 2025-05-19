@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import GoalPlanner from "./pages/GoalPlanner";
 import AICoach from "./pages/AICoach";
 import MutualFunds from "./pages/MutualFunds";
+import TaxOptimizer from "./pages/TaxOptimizer";
 
 // Layouts
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/goal-planner" element={<GoalPlanner />} />
               <Route path="/ai-coach" element={<AICoach />} />
               <Route path="/mutual-funds" element={<MutualFunds />} />
+              <Route path="/tax-optimizer" element={<TaxOptimizer />} />
             </Route>
             
             {/* Catch-all route */}

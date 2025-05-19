@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
@@ -11,6 +11,13 @@ const DashboardLayout = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Close sidebar when changing from mobile to desktop view
+  useEffect(() => {
+    if (!isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile]);
 
   if (isLoading) {
     return (
@@ -30,7 +37,7 @@ const DashboardLayout = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
         {!isMobile && (
-          <div className="hidden lg:block h-full">
+          <div className="hidden lg:block h-full transition-all duration-300">
             <Sidebar isMobile={false} />
           </div>
         )}
