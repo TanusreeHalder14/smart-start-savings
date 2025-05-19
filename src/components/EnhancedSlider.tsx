@@ -32,6 +32,9 @@ const SliderWithInput = ({
     return formatValue ? formatValue(value) : value.toString();
   };
 
+  // Ensures the value is always treated as an array for the component
+  const valueAsArray = Array.isArray(currentValue) ? currentValue : [currentValue];
+
   return (
     <div className={`space-y-2 ${className}`}>
       <Slider

@@ -34,6 +34,12 @@ export const SliderProvider: React.FC<SliderProviderProps> = ({
 }) => {
   const [currentValue, setCurrentValue] = useState<number | number[]>(defaultValue);
   
+  // Handle setting value from slider component
+  const handleSetCurrentValue = (value: number | number[]) => {
+    setCurrentValue(value);
+    onValueChange?.(value);
+  };
+  
   // Update slider value from manual input
   const updateValue = (inputValue: string | number, index?: number) => {
     const numValue = typeof inputValue === 'string' ? parseFloat(inputValue) : inputValue;
@@ -57,7 +63,11 @@ export const SliderProvider: React.FC<SliderProviderProps> = ({
   };
   
   return (
-    <SliderContext.Provider value={{ currentValue, setCurrentValue, updateValue }}>
+    <SliderContext.Provider value={{ 
+      currentValue, 
+      setCurrentValue: handleSetCurrentValue, 
+      updateValue 
+    }}>
       {children}
     </SliderContext.Provider>
   );
