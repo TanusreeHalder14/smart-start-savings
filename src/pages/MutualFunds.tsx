@@ -217,7 +217,7 @@ const MutualFunds = () => {
                   min={1000}
                   max={50000}
                   step={1000}
-                  onValueChange={setMonthlyInvestment}
+                  onValueChange={(value) => setMonthlyInvestment(Array.isArray(value) ? value : [value])}
                   inputPrefix="₹"
                   formatValue={(val) => `₹${val.toLocaleString()}`}
                 />
@@ -254,7 +254,7 @@ const MutualFunds = () => {
                   min={6}
                   max={18}
                   step={0.5}
-                  onValueChange={setExpectedReturn}
+                  onValueChange={(value) => setExpectedReturn(Array.isArray(value) ? value : [value])}
                   formatValue={(val) => `${val}%`}
                 />
               </div>

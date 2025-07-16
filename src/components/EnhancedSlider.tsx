@@ -41,7 +41,7 @@ const SliderWithInput = ({
         min={min}
         max={max}
         step={step}
-        value={currentValue}
+        value={valueAsArray}
         onValueChange={setCurrentValue}
       />
       
