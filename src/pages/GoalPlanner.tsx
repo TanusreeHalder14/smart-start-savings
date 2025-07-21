@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { ArrowUpRight, Info, TrendingUp, Save, Target } from "lucide-react";
+import { ArrowUpRight, Info, TrendingUp, Save, Target, PieChart, Plus } from "lucide-react";
 import { EnhancedSlider } from "@/components/EnhancedSlider";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 10 }, (_, i) => (currentYear + i).toString());
@@ -57,6 +58,35 @@ const GoalPlanner = () => {
       setSavedGoals(data || []);
     } catch (error) {
       console.error('Error loading goals:', error);
+    }
+  };
+
+  const updateGoalProgress = async (goalId: string, newAmount: number) => {
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ current_amount: newAmount })
+        .eq('id', goalId);
+
+      if (error) throw error;
+
+      // Track user activity
+      await supabase
+        .from('user_activity')
+        .insert({
+          user_id: user!.id,
+          activity_type: 'goal_progress_updated',
+          activity_data: {
+            goal_id: goalId,
+            new_amount: newAmount
+          }
+        });
+
+      toast.success("Goal progress updated!");
+      loadSavedGoals();
+    } catch (error) {
+      console.error('Error updating goal progress:', error);
+      toast.error("Failed to update goal progress.");
     }
   };
 
@@ -179,6 +209,24 @@ const GoalPlanner = () => {
     const budget = Number(goalBudget);
     return Math.min(100, Math.round((calculation.totalAmount / budget) * 100));
   };
+
+  // Calculate overall progress for pie chart
+  const getOverallProgress = () => {
+    if (savedGoals.length === 0) return [];
+    
+    const totalTargetAmount = savedGoals.reduce((sum, goal) => sum + goal.target_amount, 0);
+    const totalCurrentAmount = savedGoals.reduce((sum, goal) => sum + (goal.current_amount || 0), 0);
+    
+    const progressPercentage = Math.min(100, (totalCurrentAmount / totalTargetAmount) * 100);
+    const remainingPercentage = 100 - progressPercentage;
+    
+    return [
+      { name: 'Completed', value: progressPercentage, color: '#22c55e' },
+      { name: 'Remaining', value: remainingPercentage, color: '#e5e7eb' }
+    ];
+  };
+
+  const COLORS = ['#22c55e', '#e5e7eb'];
 
   return (
     <div className="space-y-6">
@@ -429,56 +477,143 @@ const GoalPlanner = () => {
         </Card>
       </div>
 
-      {/* Saved Goals Section */}
+      {/* Overall Progress Chart */}
       {user && savedGoals.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-finance-primary" />
-              Your Saved Goals
-            </CardTitle>
-            <CardDescription>Track all your financial goals</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {savedGoals.map((goal) => (
-                <div key={goal.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-semibold">{goal.name}</h3>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(goal.target_date).getFullYear()}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Target:</span>
-                      <span className="font-medium">{formatCurrency(goal.target_amount)}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PieChart className="h-5 w-5 text-finance-primary" />
+                Overall Progress
+              </CardTitle>
+              <CardDescription>Your total goal completion</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Tooltip 
+                      formatter={(value: number) => [`${value.toFixed(1)}%`]}
+                    />
+                    <Pie
+                      data={getOverallProgress()}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      dataKey="value"
+                    >
+                      {getOverallProgress().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-center mt-4">
+                <p className="text-2xl font-bold text-finance-primary">
+                  {getOverallProgress()[0]?.value.toFixed(1) || 0}%
+                </p>
+                <p className="text-sm text-muted-foreground">Goals Completed</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Saved Goals Section */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-finance-primary" />
+                Your Saved Goals
+              </CardTitle>
+              <CardDescription>Track and update your financial goals</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {savedGoals.map((goal) => {
+                  const progressPercentage = ((goal.current_amount || 0) / goal.target_amount) * 100;
+                  return (
+                    <div key={goal.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-semibold">{goal.name}</h3>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(goal.target_date).getFullYear()}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Target:</span>
+                          <span className="font-medium">{formatCurrency(goal.target_amount)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Current:</span>
+                          <span className="text-finance-primary font-medium">
+                            {formatCurrency(goal.current_amount || 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Monthly Investment:</span>
+                          <span className="text-finance-primary font-medium">
+                            {formatCurrency(goal.monthly_investment)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Expected Return:</span>
+                          <span className="text-green-600 font-medium">{goal.annual_return}%</span>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-finance-primary h-2 rounded-full"
+                            style={{ width: `${Math.min(100, progressPercentage)}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-center text-muted-foreground">
+                          {Math.round(progressPercentage)}% Complete
+                        </p>
+                      </div>
+                      
+                      {/* Update Progress */}
+                      <div className="space-y-2">
+                        <Label className="text-xs">Update Progress</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Current amount"
+                            defaultValue={goal.current_amount || 0}
+                            className="text-xs h-8"
+                            onBlur={(e) => {
+                              const newAmount = Number(e.target.value);
+                              if (newAmount !== (goal.current_amount || 0)) {
+                                updateGoalProgress(goal.id, newAmount);
+                              }
+                            }}
+                          />
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 px-2"
+                            onClick={() => {
+                              const input = document.querySelector(`input[defaultValue="${goal.current_amount || 0}"]`) as HTMLInputElement;
+                              if (input) {
+                                updateGoalProgress(goal.id, Number(input.value));
+                              }
+                            }}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Monthly Investment:</span>
-                      <span className="text-finance-primary font-medium">
-                        {formatCurrency(goal.monthly_investment)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Expected Return:</span>
-                      <span className="text-green-600 font-medium">{goal.annual_return}%</span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-finance-primary h-2 rounded-full"
-                      style={{ width: `${Math.min(100, (goal.current_amount / goal.target_amount) * 100)}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground">
-                    {Math.round((goal.current_amount / goal.target_amount) * 100)}% Complete
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
