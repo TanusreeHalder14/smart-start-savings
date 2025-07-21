@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { ArrowUpRight, Info, TrendingUp } from "lucide-react";
+import { ArrowUpRight, Info, TrendingUp, Save, Target } from "lucide-react";
 import { EnhancedSlider } from "@/components/EnhancedSlider";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 10 }, (_, i) => (currentYear + i).toString());
@@ -22,6 +24,8 @@ interface GoalCalculation {
 }
 
 const GoalPlanner = () => {
+  const { user } = useAuth();
+  
   // Goal details
   const [goalName, setGoalName] = useState<string>("");
   const [goalBudget, setGoalBudget] = useState<string>("");
@@ -29,6 +33,88 @@ const GoalPlanner = () => {
   const [monthlyInvestment, setMonthlyInvestment] = useState<number[]>([5000]);
   const [annualReturn, setAnnualReturn] = useState<number>(12);
   const [calculation, setCalculation] = useState<GoalCalculation | null>(null);
+  const [savedGoals, setSavedGoals] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Load saved goals
+  useEffect(() => {
+    if (user) {
+      loadSavedGoals();
+    }
+  }, [user]);
+
+  const loadSavedGoals = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSavedGoals(data || []);
+    } catch (error) {
+      console.error('Error loading goals:', error);
+    }
+  };
+
+  const saveGoal = async () => {
+    if (!user || !calculation || !goalName || !goalBudget) {
+      toast.error("Please complete the goal calculation first");
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .insert({
+          user_id: user.id,
+          name: goalName,
+          target_amount: Number(goalBudget),
+          current_amount: 0,
+          target_date: `${targetYear}-12-31`,
+          monthly_investment: calculation.monthlyInvestment,
+          annual_return: calculation.annualReturn
+        });
+
+      if (error) throw error;
+
+      // Track user activity
+      await supabase
+        .from('user_activity')
+        .insert({
+          user_id: user.id,
+          activity_type: 'goal_created',
+          activity_data: {
+            goal_name: goalName,
+            target_amount: Number(goalBudget),
+            monthly_investment: calculation.monthlyInvestment,
+            annual_return: calculation.annualReturn
+          }
+        });
+
+      toast.success("Goal saved successfully!");
+      loadSavedGoals();
+      
+      // Reset form
+      setGoalName("");
+      setGoalBudget("");
+      setTargetYear(years[2]);
+      setMonthlyInvestment([5000]);
+      setAnnualReturn(12);
+      setCalculation(null);
+      
+    } catch (error) {
+      console.error('Error saving goal:', error);
+      toast.error("Failed to save goal. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -297,6 +383,19 @@ const GoalPlanner = () => {
                     </div>
                   </div>
                 </div>
+                
+                {/* Save Goal Button */}
+                {user && (
+                  <Button 
+                    variant="outline"
+                    className="w-full"
+                    onClick={saveGoal}
+                    disabled={isSaving}
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    {isSaving ? "Saving..." : "Save Goal"}
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-4">
@@ -329,6 +428,58 @@ const GoalPlanner = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Saved Goals Section */}
+      {user && savedGoals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-finance-primary" />
+              Your Saved Goals
+            </CardTitle>
+            <CardDescription>Track all your financial goals</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {savedGoals.map((goal) => (
+                <div key={goal.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-semibold">{goal.name}</h3>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(goal.target_date).getFullYear()}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Target:</span>
+                      <span className="font-medium">{formatCurrency(goal.target_amount)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Monthly Investment:</span>
+                      <span className="text-finance-primary font-medium">
+                        {formatCurrency(goal.monthly_investment)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Expected Return:</span>
+                      <span className="text-green-600 font-medium">{goal.annual_return}%</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-finance-primary h-2 rounded-full"
+                      style={{ width: `${Math.min(100, (goal.current_amount / goal.target_amount) * 100)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground">
+                    {Math.round((goal.current_amount / goal.target_amount) * 100)}% Complete
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { BarChart3, Target, MessageCircle, TrendingUp, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Goal {
   id: string;
@@ -24,34 +26,61 @@ interface MutualFund {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [funds, setFunds] = useState<MutualFund[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading mock data
-    const loadData = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      // Mock goals data
-      setGoals([
-        {
-          id: "1",
-          name: "New Car",
-          targetAmount: 1200000,
-          currentAmount: 450000,
-          targetDate: "2025-12-31"
-        },
-        {
-          id: "2",
-          name: "Emergency Fund",
-          targetAmount: 500000,
-          currentAmount: 300000,
-          targetDate: "2024-06-30"
-        }
-      ]);
-      
-      // Mock mutual funds data
+    if (user) {
+      loadDashboardData();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  const loadDashboardData = async () => {
+    if (!user) return;
+    
+    try {
+      // Load user's goals
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (goalsError) throw goalsError;
+
+      // Transform goals data
+      const transformedGoals = (goalsData || []).map(goal => ({
+        id: goal.id,
+        name: goal.name,
+        targetAmount: goal.target_amount,
+        currentAmount: goal.current_amount,
+        targetDate: goal.target_date
+      }));
+
+      setGoals(transformedGoals);
+
+      // Load recent user activity
+      const { data: activityData, error: activityError } = await supabase
+        .from('user_activity')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (activityError) throw activityError;
+      setRecentActivity(activityData || []);
+
+      // Generate AI suggestions based on user data
+      generateAISuggestions(transformedGoals, activityData || []);
+
+      // Mock mutual funds data (this could come from a real API or database)
       setFunds([
         {
           id: "1",
@@ -77,10 +106,41 @@ const Dashboard = () => {
       ]);
       
       setIsLoading(false);
-    };
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const generateAISuggestions = (userGoals: Goal[], activity: any[]) => {
+    const suggestions = [];
     
-    loadData();
-  }, []);
+    // Analyze goals
+    if (userGoals.length === 0) {
+      suggestions.push("Start by setting your first financial goal to begin your investment journey.");
+    } else {
+      const totalGoalAmount = userGoals.reduce((sum, goal) => sum + goal.targetAmount, 0);
+      const totalCurrentAmount = userGoals.reduce((sum, goal) => sum + goal.currentAmount, 0);
+      const completionRate = totalCurrentAmount / totalGoalAmount;
+      
+      if (completionRate < 0.25) {
+        suggestions.push("Consider increasing your monthly investments to reach your goals faster.");
+      } else if (completionRate > 0.75) {
+        suggestions.push("Great progress! You're on track to meet most of your financial goals.");
+      }
+    }
+
+    // Analyze activity patterns
+    const recentGoals = activity.filter(a => a.activity_type === 'goal_created').length;
+    if (recentGoals > 2) {
+      suggestions.push("You've been actively setting goals. Consider diversifying your investment portfolio.");
+    }
+
+    // Add investment suggestions
+    suggestions.push("Based on current market trends, equity funds show strong potential for long-term growth.");
+    
+    setAiSuggestions(suggestions);
+  };
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -107,7 +167,9 @@ const Dashboard = () => {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Dashboard {user && <span className="text-finance-primary">- Welcome back!</span>}
+        </h1>
       </div>
 
       {/* Welcome Card */}
@@ -115,16 +177,22 @@ const Dashboard = () => {
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold mb-2">Welcome to Your Financial Dashboard</h2>
+              <h2 className="text-xl md:text-2xl font-bold mb-2">
+                {user ? `Welcome back to your Financial Dashboard` : "Welcome to Your Financial Dashboard"}
+              </h2>
               <p className="text-white/90 max-w-2xl">
-                Track your goals, get AI-powered financial advice, and discover investment opportunities all in one place.
+                {user 
+                  ? `You have ${goals.length} active goal${goals.length !== 1 ? 's' : ''} and ${recentActivity.length} recent activities.`
+                  : "Track your goals, get AI-powered financial advice, and discover investment opportunities all in one place."
+                }
               </p>
             </div>
             <Button 
               className="mt-4 md:mt-0 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white"
               onClick={() => navigate("/goal-planner")}
             >
-              <Target className="mr-2 h-4 w-4" /> Set New Goal
+              <Target className="mr-2 h-4 w-4" /> 
+              {goals.length > 0 ? "Add New Goal" : "Set First Goal"}
             </Button>
           </div>
         </CardContent>
@@ -193,25 +261,33 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="bg-gray-100 rounded-lg p-4">
-                <p className="text-sm italic">
-                  "Based on your spending patterns, you could save an additional ₹5,000 per month by optimizing your utility bills and subscription services."
-                </p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Common questions:</p>
-                <ul className="text-sm text-finance-primary space-y-1">
-                  <li className="hover:underline cursor-pointer">
-                    How can I improve my credit score?
-                  </li>
-                  <li className="hover:underline cursor-pointer">
-                    What's the best way to pay off debt?
-                  </li>
-                  <li className="hover:underline cursor-pointer">
-                    How much should I save for retirement?
-                  </li>
-                </ul>
-              </div>
+              {aiSuggestions.length > 0 ? (
+                <>
+                  <div className="bg-gray-100 rounded-lg p-4">
+                    <p className="text-sm italic">
+                      "{aiSuggestions[0]}"
+                    </p>
+                  </div>
+                  {aiSuggestions.length > 1 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">More insights:</p>
+                      <ul className="text-sm text-finance-primary space-y-1">
+                        {aiSuggestions.slice(1).map((suggestion, index) => (
+                          <li key={index} className="hover:underline cursor-pointer">
+                            {suggestion}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="bg-gray-100 rounded-lg p-4">
+                  <p className="text-sm italic">
+                    "Set your first goal to get personalized financial advice based on your preferences."
+                  </p>
+                </div>
+              )}
               <Button
                 className="w-full bg-finance-primary hover:bg-finance-primary/90"
                 onClick={() => navigate("/ai-coach")}

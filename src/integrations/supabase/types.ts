@@ -14,7 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      goals: {
+        Row: {
+          annual_return: number | null
+          created_at: string
+          current_amount: number | null
+          id: string
+          monthly_investment: number | null
+          name: string
+          target_amount: number
+          target_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          annual_return?: number | null
+          created_at?: string
+          current_amount?: number | null
+          id?: string
+          monthly_investment?: number | null
+          name: string
+          target_amount: number
+          target_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          annual_return?: number | null
+          created_at?: string
+          current_amount?: number | null
+          id?: string
+          monthly_investment?: number | null
+          name?: string
+          target_amount?: number
+          target_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_activity: {
+        Row: {
+          activity_data: Json | null
+          activity_type: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          activity_data?: Json | null
+          activity_type: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          activity_data?: Json | null
+          activity_type?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
